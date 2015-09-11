@@ -17,7 +17,7 @@ def loadEx():
     sents = []
     labels = []
     fines = []
-    files = [home + mfile for mfile in listdir(home) if mfile.endswith('.xml')]#[::50]
+    files = [home + mfile for mfile in listdir(home) if mfile.endswith('.xml')][::20]
     pool = Pool(processes=11)
     it = pool.imap(processfile, files)
     for counter in range(1, len(files) + 1):
@@ -43,7 +43,8 @@ def mymain():
     for i in range(10):
         mexp[0] = coarse_learner(mexp[0], active=True)
         mexp[1] = coarse_learner(mexp[1], active=False)
-        #mexp[2] = hybrid_learner(mexp[2], active=True)
+        mexp[2] = hybrid_learner(mexp[2], active=True)
+        mexp[3] = hybrid_learner(mexp[3], active=False)
 
 if __name__ == "__main__":
     mymain()

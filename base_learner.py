@@ -1,9 +1,13 @@
 __author__ = 'ymo'
 import pycrfsuite
+import matplotlib
+matplotlib.use('Agg')
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, average_precision_score
 from sklearn.preprocessing import LabelBinarizer
 from itertools import chain
 from numpy import array
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
 def sequence_uncertainty(tagger, xseq):
     use_marginal = True
     lseq = tagger.tag(xseq)
@@ -60,8 +64,15 @@ def bio_classification_report(y_true, y_pred):
     tagset = sorted(tagset, key=lambda tag: tag.split('-', 1)[::-1])
     class_indices = {cls: idx for idx, cls in enumerate(lb.classes_)}
     print 'True sum %d Pred sum %d Len %d' %(sum(y_true_combined), sum(y_pred_combined), len(y_pred_combined))
-    print "AUC P-R: %.4f" % average_precision_score(y_true_combined, y_pred_combined, average=None)
-    print "AUC ROC: %.4f" % roc_auc_score(y_true_combined, y_pred_combined, average=None)
+    print "AUC\tP-R: %.4f\tROC: %.4f" % (average_precision_score(y_true_combined, y_pred_combined, average=None),
+        roc_auc_score(y_true_combined, y_pred_combined, average=None))
+    #plt.figure()
+    #fpr, tpr, thr = roc_curve(y_true_combined, y_pred_combined)
+    #area = auc(fpr, tpr)
+    #plt.plot(fpr, tpr, label='{area:.3f}'.format( area=area))
+    #plt.legend(loc=4)
+    #plt.savefig('sub3.jpg')
+
     return classification_report(
         1 - y_true_combined,
         [0 if v > 0.1 else 1 for v in y_pred_combined],
