@@ -17,7 +17,7 @@ def loadEx():
     sents = []
     labels = []
     fines = []
-    files = [home + mfile for mfile in listdir(home) if mfile.endswith('.xml')][::20]
+    files = [home + mfile for mfile in listdir(home) if mfile.endswith('.xml')][::10]
     pool = Pool(processes=11)
     it = pool.imap(processfile, files)
     for counter in range(1, len(files) + 1):
@@ -27,6 +27,7 @@ def loadEx():
         labels.extend(labels1)
         fines.extend(fines1)
     print ('Loaded training examples.')
+    pool.close()
     return feats, labels, fines
 
 
@@ -40,11 +41,11 @@ def mymain():
         [[], [], feats_val, feats_pool, [], [], label_val, label_pool],
         [[], [], feats_val, feats_pool, [], [], label_val, label_pool]
     ]
-    for i in range(10):
-        mexp[0] = coarse_learner(mexp[0], active=True)
-        mexp[1] = coarse_learner(mexp[1], active=False)
-        mexp[2] = hybrid_learner(mexp[2], active=True)
-        mexp[3] = hybrid_learner(mexp[3], active=False)
+    for i in range(100):
+        #mexp[0] = coarse_learner(mexp[0], active=True, initial_size=400)
+        #mexp[1] = coarse_learner(mexp[1], active=False, initial_size=400)
+        #mexp[2] = hybrid_learner(mexp[2], active=True, initial_size=400)
+        mexp[3] = hybrid_learner(mexp[3], active=False, initial_size=400)
 
 if __name__ == "__main__":
     mymain()

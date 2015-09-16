@@ -8,6 +8,10 @@ from itertools import chain
 from numpy import array
 from sklearn.metrics import roc_curve, auc
 import matplotlib.pyplot as plt
+from os import makedirs
+import random
+workbase = '/tmp/crfmodel/%d' %random.randint(0,100000000)
+makedirs(workbase)
 def sequence_uncertainty(tagger, xseq):
     use_marginal = True
     lseq = tagger.tag(xseq)
@@ -31,14 +35,22 @@ def getTrainer():
     trainer.set_params(crfpar)
     return trainer
 
-def traincrf(feats, labels, tag, crf=getTrainer()):
+def coarse_uncertainty(feats, tag):
+    tagger = pycrfsuite.Tagger()
+    tagger.open('%s/%s.crf' % (workbase,tag))
+    y_unk = [sequence_uncertainty(tagger, xseq) for xseq in feats]
+    return y_unk
+
+def traincrf((feats, labels, tag)):
+    crf=getTrainer()
     for xseq, yseq in zip(feats, labels):
         crf.append(xseq, yseq)
-    crf.train('model/%s.crf' % tag)
+    crf.train('%s/%s.crf' % (workbase,tag))
+    return True
 
 def predictcrf(feats, tag):
     tagger = pycrfsuite.Tagger()
-    tagger.open('model/%s.crf' % tag)
+    tagger.open('%s/%s.crf' % (workbase,tag))
     y_pred = []
     y_score = []
     for xseq in feats:
@@ -49,10 +61,24 @@ def predictcrf(feats, tag):
             if lseq[i] == 'token':
                 mag = 1.0 - mag
             mags.append(mag)
-
         y_pred.append(lseq)
         y_score.append(mags)
     return y_pred, y_score
+
+def predict_help():
+    return
+def predictcrf2(feats, tag):
+    k = 12
+    taggers = [ pycrfsuite.Tagger() for i in range(k)]
+    [ tagger.open('model/%s.crf' % tag) for tagger in taggers ]
+    return
+
+def calculate_auc(y_true, y_pred):
+    lb = LabelBinarizer()
+    y_true_combined = 1 - lb.fit_transform(list(chain.from_iterable(y_true)))
+    y_pred_combined = list(chain.from_iterable(y_pred))
+    return average_precision_score(y_true_combined, y_pred_combined, average=None),\
+           roc_auc_score(y_true_combined, y_pred_combined, average=None)
 
 def bio_classification_report(y_true, y_pred):
 

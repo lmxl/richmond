@@ -6,22 +6,30 @@ from coarse_learner import *
 from numpy import array
 from random import sample
 from itertools import chain
-
+from multiprocessing import Pool
+parallel_processing = False
 
 def trainmulticrf(feats_train_fine, feats_train_coarse, label_train_fine, label_train_coarse, tag):
     fine_tags = list(set(chain(*label_train_fine)))
-    traincrf(feats_train_fine + feats_train_coarse, masklabel(label_train_fine + label_train_coarse), tag + '__coarse')
-    for fine_tag in fine_tags:
-        traincrf(feats_train_fine, masklabel(label_train_fine, mask=fine_tag), tag+'_' + fine_tag)
+    traincrf((feats_train_fine + feats_train_coarse, masklabel(label_train_fine + label_train_coarse), tag + '__coarse'))
+    if not parallel_processing:
+        for fine_tag in fine_tags:
+            traincrf((feats_train_fine, masklabel(label_train_fine, mask=fine_tag), tag+'_' + fine_tag))
+    else:
+        p = Pool(min(12,len(fine_tags)))
+        jobs = [(feats_train_fine, masklabel(label_train_fine, mask=fine_tag), tag+'_' + fine_tag) for fine_tag in fine_tags]
+        p.map(traincrf, jobs)
+        p.close()
     return fine_tags
+
+def predictcrf_helper(feats, bags):
+    pred_fine, score_fine = predictcrf(feats, bags)
+    return score_fine
 
 def predictmulticrf(feats_val, fine_tags, tag, alpha = 0.5):
     beta = 1.0 - alpha
     pred_coarse, score_coarse = predictcrf(feats_val, tag + '__coarse')
-    score_fine_list = []
-    for fine_tag in fine_tags:
-        pred_fine, score_fine = predictcrf(feats_val, tag+'_' + fine_tag)
-        score_fine_list.append(score_fine)
+    score_fine_list = [predictcrf_helper(feats_val, tag+'_' + fine_tag) for fine_tag in fine_tags]
     final_score_fine = []
     for i in range(len(score_coarse)):
         craft_score_fine = []
@@ -64,7 +72,11 @@ def hybrid_learner(exp, step_size=50, initial_size=200, active = False, fine_rat
 
     fine_tags = trainmulticrf(feats_train_fine, feats_train_coarse, label_train_fine, label_train_coarse, tag)
     score_val = predictmulticrf(feats_val,fine_tags, tag)
-    open('report/%s_report.txt' % tag,'w').write(tag + '\r\n' + bio_classification_report(masklabel(label_val), score_val))
+    pr, roc = calculate_auc(masklabel(label_val), score_val)
+    obj = {'coarse':False, 'active': active, 'pr': pr, 'roc': roc,
+           'size': len(feats_train_fine) + len(feats_train_coarse), 'ratio': fine_ratio}
+    trace(obj)
+    #open('report/%s_report.txt' % tag,'w').write(tag + '\r\n' + bio_classification_report(masklabel(label_val), score_val))
     if active:
         unk_coarse, final_unk_fine = fine_uncertainty(feats_pool, fine_tags, tag)
         unk_coarse = array(unk_coarse)

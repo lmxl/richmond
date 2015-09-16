@@ -1,4 +1,7 @@
 __author__ = 'ymo'
+import json
+import sys
+
 def partition_set(feats, labels, indices):
     indices=set(indices)
     feats_select = []
@@ -60,3 +63,6 @@ def word2features(sent, i):
 
 def sent2features(sent):
     return [word2features(sent, i) for i in range(len(sent))]
+
+def trace(obj):
+    print >> sys.stderr, json.dumps(obj,indent=1, sort_keys=True)
