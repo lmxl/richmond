@@ -44,8 +44,8 @@ def mymain():
     for i in range(100):
         #mexp[0] = coarse_learner(mexp[0], active=True, initial_size=400)
         #mexp[1] = coarse_learner(mexp[1], active=False, initial_size=400)
-        #mexp[2] = hybrid_learner(mexp[2], active=True, initial_size=400)
-        mexp[3] = hybrid_learner(mexp[3], active=False, initial_size=400)
+        mexp[2] = hybrid_learner(mexp[2], active=True, initial_size=400, fine_ratio=0.4)
+        #mexp[3] = hybrid_learner(mexp[3], active=False, initial_size=400)
 
 if __name__ == "__main__":
     mymain()

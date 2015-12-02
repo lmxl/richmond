@@ -7,7 +7,9 @@ from numpy import array
 from random import sample
 from itertools import chain
 from multiprocessing import Pool
+import numpy as np
 parallel_processing = False
+
 
 def trainmulticrf(feats_train_fine, feats_train_coarse, label_train_fine, label_train_coarse, tag):
     fine_tags = list(set(chain(*label_train_fine)))
@@ -22,9 +24,11 @@ def trainmulticrf(feats_train_fine, feats_train_coarse, label_train_fine, label_
         p.close()
     return fine_tags
 
+
 def predictcrf_helper(feats, bags):
     pred_fine, score_fine = predictcrf(feats, bags)
     return score_fine
+
 
 def predictmulticrf(feats_val, fine_tags, tag, alpha = 0.5):
     beta = 1.0 - alpha
@@ -39,6 +43,7 @@ def predictmulticrf(feats_val, fine_tags, tag, alpha = 0.5):
         final_score_fine.append(craft_score_fine)
     return final_score_fine
 
+
 def fine_uncertainty(feats, fine_tags, tag, alpha = 0.5):
     beta = 1.0 - alpha
     unk_coarse = coarse_uncertainty(feats, tag + '__coarse')
@@ -52,6 +57,7 @@ def fine_uncertainty(feats, fine_tags, tag, alpha = 0.5):
         final_unk_fine.append(unk_coarse[i]*alpha + high*beta)
     return unk_coarse, final_unk_fine
 
+
 def hybrid_learner(exp, step_size=50, initial_size=200, active = False, fine_ratio = 1.0):
     step_size_fine = int(step_size*fine_ratio)
     step_size_coarse = step_size - step_size_fine
@@ -63,25 +69,26 @@ def hybrid_learner(exp, step_size=50, initial_size=200, active = False, fine_rat
         if fine_ratio < 1.0:
             feats_train_fine, feats_train_coarse, label_train_fine, label_train_coarse = \
                 train_test_split(feats_train_fine, label_train_fine,
-                             train_size=int(fine_ratio*initial_size), random_state=42)
+                                 train_size=int(fine_ratio*initial_size), random_state=42)
     if active:
         tag = 'hybrid_active_%d_%d' % (len(label_train_fine), len(label_train_coarse))
     else:
         tag = 'hybrid_passive_%d_%d' % (len(label_train_fine), len(label_train_coarse))
-    print '= Experiment on [%s]' % tag , ' <-', len(feats_train_fine), len(feats_train_coarse),len(feats_pool), len(feats_val)
+    print '= Experiment on [%s]' % tag, ' <-', len(feats_train_fine), len(feats_train_coarse),len(feats_pool), len(feats_val)
 
     fine_tags = trainmulticrf(feats_train_fine, feats_train_coarse, label_train_fine, label_train_coarse, tag)
     score_val = predictmulticrf(feats_val,fine_tags, tag)
     pr, roc = calculate_auc(masklabel(label_val), score_val)
     obj = {'coarse':False, 'active': active, 'pr': pr, 'roc': roc,
            'size': len(feats_train_fine) + len(feats_train_coarse), 'ratio': fine_ratio}
-    trace(obj)
-    #open('report/%s_report.txt' % tag,'w').write(tag + '\r\n' + bio_classification_report(masklabel(label_val), score_val))
+    #trace(obj)
+    #  open('report/%s_report.txt' % tag,'w').write(tag + '\r\n' +
+    #       bio_classification_report(masklabel(label_val), score_val))
     if active:
         unk_coarse, final_unk_fine = fine_uncertainty(feats_pool, fine_tags, tag)
         unk_coarse = array(unk_coarse)
         final_unk_fine = array(final_unk_fine)
-        indices_next_fine = final_unk_fine.argsort()[-step_size_fine:][::-1]
+        indices_next_fine = final_unk_fine.argsort()[::-1][:step_size_fine]
         args_unk_coarse = unk_coarse.argsort()[::-1]
         new_args_unk_coarse = []
         for v in args_unk_coarse:
@@ -92,15 +99,15 @@ def hybrid_learner(exp, step_size=50, initial_size=200, active = False, fine_rat
         indices_next_fine = sample(range(len(label_pool)), step_size_fine)
         indices_next_coarse = sample(set(range(len(label_pool))) - set(indices_next_fine), step_size_coarse)
 
-    #print indices_next_fine
-    #print indices_next_coarse
+    #print indices_next_fine, len(indices_next_fine)
+    #print indices_next_coarse, len(indices_next_coarse)
     feats_next, feats_rest, labels_next, labels_rest = partition_set(feats_pool, label_pool, indices_next_fine)
     feats_train_fine.extend(feats_next)
     label_train_fine.extend(labels_next)
     feats_next, feats_rest, labels_next, labels_rest = partition_set(feats_rest, labels_rest, indices_next_coarse)
     feats_train_coarse.extend(feats_next)
     label_train_coarse.extend(labels_next)
-    feats_pool=feats_rest
-    label_pool=labels_rest
-    return [ feats_train_coarse, feats_train_fine , feats_val, feats_pool, label_train_coarse,\
-             label_train_fine, label_val, label_pool ]
+    feats_pool = feats_rest
+    label_pool = labels_rest
+    return [feats_train_coarse, feats_train_fine, feats_val, feats_pool, label_train_coarse,
+            label_train_fine, label_val, label_pool], obj
