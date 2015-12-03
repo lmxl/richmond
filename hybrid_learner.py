@@ -1,25 +1,24 @@
-__author__ = 'ymo'
-from base_learner import *
-from ex_util import *
-from sklearn.cross_validation import train_test_split
 from coarse_learner import *
 from numpy import array
 from random import sample
 from itertools import chain
 from multiprocessing import Pool
-import numpy as np
+__author__ = 'ymo'
 parallel_processing = False
 
 
 def trainmulticrf(feats_train_fine, feats_train_coarse, label_train_fine, label_train_coarse, tag):
     fine_tags = list(set(chain(*label_train_fine)))
-    traincrf((feats_train_fine + feats_train_coarse, masklabel(label_train_fine + label_train_coarse), tag + '__coarse'))
+    traincrf((feats_train_fine + feats_train_coarse,
+              masklabel(label_train_fine + label_train_coarse),
+              tag + '__coarse'))
     if not parallel_processing:
         for fine_tag in fine_tags:
             traincrf((feats_train_fine, masklabel(label_train_fine, mask=fine_tag), tag+'_' + fine_tag))
     else:
-        p = Pool(min(12,len(fine_tags)))
-        jobs = [(feats_train_fine, masklabel(label_train_fine, mask=fine_tag), tag+'_' + fine_tag) for fine_tag in fine_tags]
+        p = Pool(min(12, len(fine_tags)))
+        jobs = [(feats_train_fine,
+                 masklabel(label_train_fine, mask=fine_tag), tag+'_' + fine_tag) for fine_tag in fine_tags]
         p.map(traincrf, jobs)
         p.close()
     return fine_tags
@@ -30,7 +29,7 @@ def predictcrf_helper(feats, bags):
     return score_fine
 
 
-def predictmulticrf(feats_val, fine_tags, tag, alpha = 0.5):
+def predictmulticrf(feats_val, fine_tags, tag, alpha=0.5):
     beta = 1.0 - alpha
     pred_coarse, score_coarse = predictcrf(feats_val, tag + '__coarse')
     score_fine_list = [predictcrf_helper(feats_val, tag+'_' + fine_tag) for fine_tag in fine_tags]
@@ -44,7 +43,7 @@ def predictmulticrf(feats_val, fine_tags, tag, alpha = 0.5):
     return final_score_fine
 
 
-def fine_uncertainty(feats, fine_tags, tag, alpha = 0.5):
+def fine_uncertainty(feats, fine_tags, tag, alpha=0.5):
     beta = 1.0 - alpha
     unk_coarse = coarse_uncertainty(feats, tag + '__coarse')
     unk_fine_list = []
@@ -58,10 +57,10 @@ def fine_uncertainty(feats, fine_tags, tag, alpha = 0.5):
     return unk_coarse, final_unk_fine
 
 
-def hybrid_learner(exp, step_size=50, initial_size=200, active = False, fine_ratio = 1.0):
+def hybrid_learner(exp, step_size=50, initial_size=200, active=False, fine_ratio=1.0):
     step_size_fine = int(step_size*fine_ratio)
     step_size_coarse = step_size - step_size_fine
-    feats_train_coarse, feats_train_fine , feats_val, feats_pool, label_train_coarse,\
+    feats_train_coarse, feats_train_fine, feats_val, feats_pool, label_train_coarse,\
         label_train_fine, label_val, label_pool = exp
     if len(feats_train_fine) + len(feats_train_coarse) < initial_size:
         feats_train_fine, feats_pool, label_train_fine, label_pool = \
@@ -74,14 +73,16 @@ def hybrid_learner(exp, step_size=50, initial_size=200, active = False, fine_rat
         tag = 'hybrid_active_%d_%d' % (len(label_train_fine), len(label_train_coarse))
     else:
         tag = 'hybrid_passive_%d_%d' % (len(label_train_fine), len(label_train_coarse))
-    print '= Experiment on [%s]' % tag, ' <-', len(feats_train_fine), len(feats_train_coarse),len(feats_pool), len(feats_val)
+    print '= Experiment on [%s]' % tag, ' <-', \
+        len(feats_train_fine), len(feats_train_coarse), len(feats_pool), len(feats_val)
 
     fine_tags = trainmulticrf(feats_train_fine, feats_train_coarse, label_train_fine, label_train_coarse, tag)
-    score_val = predictmulticrf(feats_val,fine_tags, tag)
+    score_val = predictmulticrf(feats_val, fine_tags, tag)
     pr, roc = calculate_auc(masklabel(label_val), score_val)
-    obj = {'coarse':False, 'active': active, 'pr': pr, 'roc': roc,
-           'size': len(feats_train_fine) + len(feats_train_coarse), 'ratio': fine_ratio}
-    #trace(obj)
+    obj = {'coarse': False, 'active': active, 'pr': pr, 'roc': roc,
+           'size': len(feats_train_fine) + len(feats_train_coarse), 'ratio': fine_ratio,
+           'fine_size': len(feats_train_fine), 'coarse_size': len(feats_train_coarse)}
+    # trace(obj)
     #  open('report/%s_report.txt' % tag,'w').write(tag + '\r\n' +
     #       bio_classification_report(masklabel(label_val), score_val))
     if active:
@@ -99,8 +100,8 @@ def hybrid_learner(exp, step_size=50, initial_size=200, active = False, fine_rat
         indices_next_fine = sample(range(len(label_pool)), step_size_fine)
         indices_next_coarse = sample(set(range(len(label_pool))) - set(indices_next_fine), step_size_coarse)
 
-    #print indices_next_fine, len(indices_next_fine)
-    #print indices_next_coarse, len(indices_next_coarse)
+    # print indices_next_fine, len(indices_next_fine)
+    # print indices_next_coarse, len(indices_next_coarse)
     feats_next, feats_rest, labels_next, labels_rest = partition_set(feats_pool, label_pool, indices_next_fine)
     feats_train_fine.extend(feats_next)
     label_train_fine.extend(labels_next)
